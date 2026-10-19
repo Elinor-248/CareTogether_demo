@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Care Coordination — Dual Interface Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  body{margin:0}
+  a{color:#E85A34;text-decoration:none}
+  a:hover{color:#FF7A50}
+  ::-webkit-scrollbar{width:0;height:0}
+  input,textarea,button{font:inherit}
+  button{-webkit-tap-highlight-color:transparent}
+  .phone-frame{width:380px;height:800px;border-radius:54px;background:#171310;padding:14px;box-shadow:0 24px 48px rgba(58,42,32,0.28);position:relative;box-sizing:border-box}
+  .phone-notch{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#171310;border-radius:0 0 16px 16px;z-index:5}
+  .phone-screen{width:100%;height:100%;border-radius:40px;overflow-y:auto;overflow-x:hidden;background:#FDF6EC;position:relative;-ms-overflow-style:none;scrollbar-width:none}
+</style>
+</head>
+<body>
+<div style="min-height:100vh;background:#FDF6EC;padding:48px 24px;box-sizing:border-box;font-family:'Nunito',sans-serif;color:#3A2A20;position:relative;overflow:hidden">
+
+  <div style="position:absolute;width:360px;height:360px;border-radius:50%;background:#FFD98A;filter:blur(70px);opacity:.5;top:-90px;left:-90px;z-index:0"></div>
+  <div style="position:absolute;width:400px;height:400px;border-radius:50%;background:#8FE0D6;filter:blur(80px);opacity:.4;bottom:-110px;right:-90px;z-index:0"></div>
+
+  <div style="position:relative;z-index:1;display:flex;align-items:flex-end;justify-content:space-between;max-width:1100px;margin:0 auto 36px;gap:16px;flex-wrap:wrap">
+    <div>
+      <div style="font-family:'Baloo 2',sans-serif;font-size:34px;font-weight:700;letter-spacing:-0.01em">Care Coordination</div>
+      <p style="font-size:15px;color:#8C7A6B;max-width:56ch;margin-top:6px;line-height:1.5">Alex assigns and reviews care tasks on the left; May reads, performs and reports on them on the right. Both panes share one live task, so an action on one side updates the other instantly.</p>
+    </div>
+    <button type="button" id="resetBtn" style="padding:11px 22px;border-radius:999px;border:2px solid #E8D9C4;background:#fff;color:#8C7A6B;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer">Reset demo</button>
+  </div>
+
+  <div style="position:relative;z-index:1;display:flex;gap:56px;align-items:flex-start;justify-content:center;flex-wrap:wrap;max-width:1100px;margin:0 auto">
+
+    <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+      <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:999px;background:#FFE9DE">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#FF7A50"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="#fff" stroke-width="2.5"/><path d="M4 20C4 15 8 13 12 13C16 13 20 15 20 20" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg></span>
+        <span style="font-family:'Baloo 2',sans-serif;font-size:15px;font-weight:700;color:#3A2A20">Alex <span style="color:#B0947A;font-weight:600;font-family:'Nunito',sans-serif">— Family Member</span></span>
+      </div>
+      <div class="phone-frame"><div class="phone-notch"></div><div class="phone-screen" id="familyPane"></div></div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+      <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:999px;background:#DEF3F0">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#2FB6A6"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="#fff" stroke-width="2.5"/><path d="M4 20C4 15 8 13 12 13C16 13 20 15 20 20" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg></span>
+        <span style="font-family:'Baloo 2',sans-serif;font-size:15px;font-weight:700;color:#3A2A20">May <span style="color:#8CA39F;font-weight:600;font-family:'Nunito',sans-serif">— Caregiver</span></span>
+      </div>
+      <div class="phone-frame"><div class="phone-notch"></div><div class="phone-screen" id="caregiverPane"></div></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const SUGGESTED = [
+  { key: 'redness', label: 'Any redness?' },
+  { key: 'swelling', label: 'Any swelling?' },
+  { key: 'pain', label: 'Any pain or discomfort?' },
+  { key: 'unusual', label: 'Anything unusual?' },
+];
+const CATEGORIES = ['Medication', 'Meals', 'Hygiene', 'Exercise', 'Health Check', 'Other'];
+const STATUS_META = {
+  upcoming: { label: 'Upcoming', bg: '#FFF3D0', color: '#8A6A10' },
+  viewed: { label: 'Viewed', bg: '#F1E9D8', color: '#8C7355' },
+  in_progress: { label: 'In Progress', bg: '#DFF5F2', color: '#167A6E' },
+  report_submitted: { label: 'Report Submitted', bg: '#FFE4DA', color: '#C1461F' },
+  completed: { label: 'Completed', bg: '#E3F4DE', color: '#3F8A3B' },
+};
+function chipStyle(selected, accent) {
+  return selected
+    ? `background:${accent};color:#fff;border:2px solid ${accent};border-radius:999px;padding:8px 15px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;display:inline-flex;align-items:center`
+    : `background:#fff;color:#8C7A6B;border:2px solid #F0E4D3;border-radius:999px;padding:8px 15px;font-family:'Nunito',sans-serif;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center`;
+}
+function boxStyle(done, accent) {
+  return done
+    ? `width:26px;height:26px;border-radius:9px;background:${accent};display:flex;align-items:center;justify-content:center;flex-shrink:0`
+    : `width:26px;height:26px;border-radius:9px;border:2.5px solid #ECDFC9;background:#fff;flex-shrink:0`;
+}
+function btnStyle(accent, disabled) {
+  return `width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:15px;border:none;border-radius:999px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:#fff;background:${disabled ? '#E7DCCB' : accent};cursor:${disabled ? 'not-allowed' : 'pointer'}`;
+}
+function esc(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function photoBox(label, height) {
+  return `<div style="width:100%;height:${height}px;border-radius:16px;background:repeating-linear-gradient(135deg,#FDEEDD,#FDEEDD 12px,#FCE7D6 12px,#FCE7D6 24px);display:flex;align-items:center;justify-content:center;gap:8px;color:#B0947A;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;border:2px dashed #F0D9BE;box-sizing:border-box"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 8H8L10 5H14L16 8H20A1 1 0 0 1 21 9V18A1 1 0 0 1 20 19H4A1 1 0 0 1 3 18V9A1 1 0 0 1 4 8Z" stroke="#B0947A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.2" stroke="#B0947A" stroke-width="2"/></svg>${label}</div>`;
+}
+
+const I18N = {
+  en: {
+    today: 'Today', dateline: 'Thursday, July 23',
+    emptyToday: "No tasks yet. Alex hasn't assigned anything today.",
+    nextTask: 'Next Task', photoRequired: 'Photo required',
+    viewTask: 'View Task', continueTask: 'Continue Task',
+    waitingReview: 'Report submitted · waiting for Alex to confirm',
+    completedToday: 'Completed Today', confirmedBy: 'Confirmed by Alex at',
+    stepByStep: 'Step-by-step', afterCompleting: 'After completing, you will need to',
+    startTask: 'Start Task',
+    taskInProgress: 'Task in Progress', completeAndReport: 'Complete and Report',
+    taskReport: 'Task Report', completionPhoto: 'Completion photo',
+    takePhoto: 'Take Photo', retake: 'Retake',
+    yes: 'Yes', no: 'No', notSure: 'Not sure',
+    shortAnswerPlaceholder: 'Enter a short answer',
+    anythingElse: 'Anything else to report?', notePlaceholder: 'Add a short note for Alex',
+    confirmCheckbox: 'I completed the task by following the instructions.',
+    reviewReport: 'Review Report', note: 'Note',
+    editReport: 'Edit Report', submitReport: 'Submit Report',
+    reportPhoto: 'Take one completion photo', reportPhotoOptional: 'Optionally add a completion photo',
+    reportAnswerQ: (n) => `Answer ${n} question${n > 1 ? 's' : ''}`, reportFeel: 'Answer how Max is feeling', reportNote: 'Add a short note',
+    translating: 'Translating…', translateFailed: 'Translation failed —', retry: 'Retry',
+  },
+  id: {
+    today: 'Hari Ini', dateline: 'Kamis, 23 Juli',
+    emptyToday: 'Belum ada tugas. Alex belum menugaskan apa pun hari ini.',
+    nextTask: 'Tugas Berikutnya', photoRequired: 'Foto wajib',
+    viewTask: 'Lihat Tugas', continueTask: 'Lanjutkan Tugas',
+    waitingReview: 'Laporan terkirim · menunggu konfirmasi Alex',
+    completedToday: 'Selesai Hari Ini', confirmedBy: 'Dikonfirmasi oleh Alex pukul',
+    stepByStep: 'Langkah demi Langkah', afterCompleting: 'Setelah selesai, Anda perlu',
+    startTask: 'Mulai Tugas',
+    taskInProgress: 'Tugas Sedang Berjalan', completeAndReport: 'Selesai dan Laporkan',
+    taskReport: 'Laporan Tugas', completionPhoto: 'Foto penyelesaian',
+    takePhoto: 'Ambil Foto', retake: 'Ambil Ulang',
+    yes: 'Ya', no: 'Tidak', notSure: 'Tidak yakin',
+    shortAnswerPlaceholder: 'Masukkan jawaban singkat',
+    anythingElse: 'Ada hal lain yang perlu dilaporkan?', notePlaceholder: 'Tambahkan catatan singkat untuk Alex',
+    confirmCheckbox: 'Saya telah menyelesaikan tugas sesuai instruksi.',
+    reviewReport: 'Tinjau Laporan', note: 'Catatan',
+    editReport: 'Edit Laporan', submitReport: 'Kirim Laporan',
+    reportPhoto: 'Ambil satu foto penyelesaian', reportPhotoOptional: 'Tambahkan foto penyelesaian (opsional)',
+    reportAnswerQ: (n) => `Jawab ${n} pertanyaan`, reportFeel: 'Jawab bagaimana perasaan Max', reportNote: 'Tambahkan catatan singkat',
+    translating: 'Menerjemahkan…', translateFailed: 'Terjemahan gagal —', retry: 'Coba lagi',
+  },
+};
+const STATUS_KEY = { upcoming: 'Upcoming', viewed: 'Viewed', in_progress: 'Sedang Berjalan/In Progress', report_submitted: 'Report Submitted', completed: 'Completed' };
+const STATUS_KEY_ID = { upcoming: 'statusUpcoming', viewed: 'statusViewed', in_progress: 'statusInProgress', report_submitted: 'statusReportSubmitted', completed: 'statusCompleted' };
+const STATUS_LABEL_ID = {
+  upcoming: { en: 'Upcoming', id: 'Akan Datang' }, viewed: { en: 'Viewed', id: 'Dilihat' },
+  in_progress: { en: 'In Progress', id: 'Sedang Berjalan' }, report_submitted: { en: 'Report Submitted', id: 'Laporan Terkirim' },
+  completed: { en: 'Completed', id: 'Selesai' },
+};
+
+// Demo-only mock translator: this stands in for the AI translation call
+// (window.claude.complete) used in the original Claude Design prototype,
+// which isn't available in a standalone file. Known demo strings map to
+// real Bahasa Indonesia; anything else passes through unchanged so the
+// translating/retry flow still demonstrates correctly.
+const MOCK_ID = {
+  "Please change the dressing on Max's left leg.": "Tolong ganti perban di kaki kiri Max.",
+  'Wash and dry your hands.': 'Cuci dan keringkan tangan Anda.',
+  'Remove the old dressing carefully.': 'Lepaskan perban lama dengan hati-hati.',
+  'Clean the wound with saline.': 'Bersihkan luka dengan larutan saline.',
+  'Apply a new dressing.': 'Pasang perban baru.',
+  'Do not apply alcohol directly to the wound.': 'Jangan oleskan alkohol langsung ke luka.',
+  'Any redness?': 'Ada kemerahan?',
+  'Any swelling?': 'Ada pembengkakan?',
+  'Any pain or discomfort?': 'Ada rasa sakit atau tidak nyaman?',
+  'Anything unusual?': 'Ada hal yang tidak biasa?',
+  'How does Max feel?': 'Bagaimana perasaan Max?',
+};
+function mockTranslate(text) { return MOCK_ID[text] !== undefined ? MOCK_ID[text] : text; }
+function mockTranslateBack(text) {
+  const hit = Object.entries(MOCK_ID).find(([, v]) => v === text);
+  return hit ? hit[0] : text;
+}
+
+function buildReportSummary(t) {
+  const lines = [];
+  if (t.photoReq === 'required') lines.push('Take one completion photo');
+  else if (t.photoReq === 'optional') lines.push('Optionally add a completion photo');
+  const ynQ = t.questions.filter(q => q.type === 'yn');
+  if (ynQ.length > 0) lines.push('Answer ' + ynQ.length + (ynQ.length > 1 ? ' questions' : ' question'));
+  if (t.questions.some(q => q.type === 'short')) lines.push('Answer how Max is feeling');
+  if (t.askNote) lines.push('Add a short note');
+  return lines.map((text, idx) => ({ idx, text }));
+}
+function buildReportSummaryI18n(t, L) {
+  const lines = [];
+  if (t.photoReq === 'required') lines.push(L.reportPhoto);
+  else if (t.photoReq === 'optional') lines.push(L.reportPhotoOptional);
+  const ynQ = t.questions.filter(q => q.type === 'yn');
+  if (ynQ.length > 0) lines.push(L.reportAnswerQ(ynQ.length));
+  if (t.questions.some(q => q.type === 'short')) lines.push(L.reportFeel);
+  if (t.askNote) lines.push(L.reportNote);
+  return lines.map((text, idx) => ({ idx, text }));
+}
+
+class App {
+  constructor() {
+    this.state = {
+      familyScreen: 'home', caregiverScreen: 'today', wizardStep: 1,
+      draft: null, task: null, submit: null,
+      caregiverLang: 'en', langMenuOpen: false, translating: false, taskTranslating: false,
+    };
+    this.state.draft = this.freshDraft();
+    this.state.submit = this.freshSubmit();
+  }
+
+  setState(updater) {
+    const patch = typeof updater === 'function' ? updater(this.state) : updater;
+    if (patch === this.state) return;
+    this.state = { ...this.state, ...patch };
+    this.render();
+    this.afterUpdate();
+  }
+
+  afterUpdate() {
+    const s = this.state;
+    if (s.caregiverLang === 'id' && s.task && !s.task.id_ready && !s.taskTranslating && !s.task.translateFailed) {
+      this.ensureTaskTranslated();
+    }
+  }
+
+  formatNow() { return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+
+  freshDraft() {
+    return {
+      title: '', date: 'Today', time: '3:00 PM', category: null,
+      description: "Please change the dressing on Max's left leg.",
+      steps: ['Wash and dry your hands.', 'Remove the old dressing carefully.', 'Clean the wound with saline.', 'Apply a new dressing.'],
+      note: 'Do not apply alcohol directly to the wound.',
+      refPhotoAdded: false, photoReq: 'required', askNote: true,
+      ynSelected: { redness: true, swelling: true, pain: false, unusual: false }, shortAnswerOn: true,
+    };
+  }
+  freshSubmit() { return { photoTaken: false, answers: {}, shortAnswer: '', note: '', confirmed: false }; }
+
+  toggleLangMenu() { this.setState(s => ({ langMenuOpen: !s.langMenuOpen })); }
+  setCaregiverLang(code) { this.setState({ caregiverLang: code, langMenuOpen: false }); }
+  retryTranslate() { this.setState(s => s.task ? { task: { ...s.task, translateFailed: false } } : s); }
+
+  async ensureTaskTranslated() {
+    this.setState({ taskTranslating: true });
+    const t = this.state.task;
+    await new Promise(r => setTimeout(r, 650));
+    this.setState(s2 => s2.task ? {
+      task: {
+        ...s2.task,
+        title_id: mockTranslate(t.title),
+        description_id: mockTranslate(t.description),
+        note_id: t.note ? mockTranslate(t.note) : t.note,
+        steps_id: t.steps.map(mockTranslate),
+        questions_id: t.questions.map(q => mockTranslate(q.label)),
+        id_ready: true, translateFailed: false,
+      },
+      taskTranslating: false,
+    } : { taskTranslating: false });
+  }
+
+  setDraftField(key, val) { this.setState(s => ({ draft: { ...s.draft, [key]: val } })); }
+  updateTitle(v) { this.setDraftField('title', v); }
+  updateTime(v) { this.setDraftField('time', v); }
+  updateDescription(v) { this.setDraftField('description', v); }
+  updateNote(v) { this.setDraftField('note', v); }
+  updateStepText(i, v) { this.setState(s => { const steps = [...s.draft.steps]; steps[i] = v; return { draft: { ...s.draft, steps } }; }); }
+  addStep() { this.setState(s => ({ draft: { ...s.draft, steps: [...s.draft.steps, ''] } })); }
+  removeStep(i) { this.setState(s => ({ draft: { ...s.draft, steps: s.draft.steps.filter((_, idx) => idx !== i) } })); }
+  toggleRefPhoto() { this.setState(s => ({ draft: { ...s.draft, refPhotoAdded: !s.draft.refPhotoAdded } })); }
+  setPhotoReq(val) { this.setDraftField('photoReq', val); }
+  setDate(val) { this.setDraftField('date', val); }
+  toggleCategory(c) { this.setState(s => ({ draft: { ...s.draft, category: s.draft.category === c ? null : c } })); }
+  toggleAskNote() { this.setState(s => ({ draft: { ...s.draft, askNote: !s.draft.askNote } })); }
+  toggleShortAnswer() { this.setState(s => ({ draft: { ...s.draft, shortAnswerOn: !s.draft.shortAnswerOn } })); }
+  toggleSuggested(key) { this.setState(s => ({ draft: { ...s.draft, ynSelected: { ...s.draft.ynSelected, [key]: !s.draft.ynSelected[key] } } })); }
+  wizardNext() { this.setState(s => ({ wizardStep: s.wizardStep + 1 })); }
+  wizardBack() { this.setState(s => ({ wizardStep: s.wizardStep - 1 })); }
+
+  goHome() { this.setState({ familyScreen: 'home' }); }
+  startCreateTask() { this.setState({ familyScreen: 'wizard', wizardStep: 1, draft: this.freshDraft() }); }
+  openFamilyDetail() { this.setState({ familyScreen: 'detail' }); }
+  openReportReview() { this.setState({ familyScreen: 'report' }); }
+  goCareLog() { this.setState({ familyScreen: 'log' }); }
+
+  publishTask() {
+    const d = this.state.draft;
+    const questions = [];
+    SUGGESTED.forEach(sg => { if (d.ynSelected[sg.key]) questions.push({ key: sg.key, label: sg.label, type: 'yn' }); });
+    if (d.shortAnswerOn) questions.push({ key: 'feel', label: 'How does Max feel?', type: 'short' });
+    const steps = d.steps.filter(t => t.trim() !== '');
+    const task = {
+      title: d.title.trim(), date: d.date, time: d.time, category: d.category,
+      description: d.description, steps, note: d.note,
+      refPhotoAdded: d.refPhotoAdded, photoReq: d.photoReq, askNote: d.askNote,
+      questions, status: 'upcoming', stepsDone: steps.map(() => false),
+      timeline: [{ t: this.formatNow(), text: 'Task created by Alex' }],
+      report: null,
+    };
+    this.setState({ task, familyScreen: 'detail', submit: this.freshSubmit() });
+  }
+
+  confirmCompletion() {
+    this.setState(s => {
+      const t = { ...s.task, status: 'completed', completedAt: this.formatNow() };
+      t.timeline = [...s.task.timeline, { t: this.formatNow(), text: 'Alex confirmed the report' }];
+      return { task: t, familyScreen: 'log' };
+    });
+  }
+
+  resetAll() {
+    this.setState({ task: null, familyScreen: 'home', caregiverScreen: 'today', wizardStep: 1, draft: this.freshDraft(), submit: this.freshSubmit(), caregiverLang: 'en', langMenuOpen: false, translating: false, taskTranslating: false });
+  }
+
+  openCaregiverDetail() {
+    this.setState(s => {
+      if (!s.task) return { caregiverScreen: 'detail' };
+      let t = s.task;
+      if (t.status === 'upcoming') {
+        t = { ...t, status: 'viewed', timeline: [...t.timeline, { t: this.formatNow(), text: 'May viewed the task' }] };
+      }
+      return { task: t, caregiverScreen: 'detail' };
+    });
+  }
+
+  startTask() {
+    this.setState(s => {
+      const t = { ...s.task, status: 'in_progress' };
+      t.timeline = [...s.task.timeline, { t: this.formatNow(), text: 'May started the task' }];
+      t.stepsDone = t.steps.map(() => false);
+      return { task: t, caregiverScreen: 'progress' };
+    });
+  }
+
+  toggleStepDone(i) {
+    this.setState(s => { const sd = [...s.task.stepsDone]; sd[i] = !sd[i]; return { task: { ...s.task, stepsDone: sd } }; });
+  }
+
+  goSubmitReport() { this.setState({ caregiverScreen: 'submit' }); }
+  backToProgress() { this.setState({ caregiverScreen: 'progress' }); }
+  takePhoto() { this.setState(s => ({ submit: { ...s.submit, photoTaken: true } })); }
+  retakePhoto() { this.setState(s => ({ submit: { ...s.submit, photoTaken: false } })); }
+  setAnswer(key, val) { this.setState(s => ({ submit: { ...s.submit, answers: { ...s.submit.answers, [key]: val } } })); }
+  updateShortAnswer(v) { this.setState(s => ({ submit: { ...s.submit, shortAnswer: v } })); }
+  updateCaregiverNote(v) { this.setState(s => ({ submit: { ...s.submit, note: v } })); }
+  toggleConfirmed() { this.setState(s => ({ submit: { ...s.submit, confirmed: !s.submit.confirmed } })); }
+  goReviewReport() { this.setState({ caregiverScreen: 'review' }); }
+  editReport() { this.setState({ caregiverScreen: 'submit' }); }
+
+  async submitReport() {
+    const s0 = this.state;
+    const lang = s0.caregiverLang;
+    let shortAnswerEn = s0.submit.shortAnswer;
+    let noteEn = s0.submit.note;
+    let translated = false;
+    if (lang === 'id' && (s0.submit.shortAnswer.trim() || s0.submit.note.trim())) {
+      this.setState({ translating: true });
+      await new Promise(r => setTimeout(r, 650));
+      shortAnswerEn = s0.submit.shortAnswer ? mockTranslateBack(s0.submit.shortAnswer) : '';
+      noteEn = s0.submit.note ? mockTranslateBack(s0.submit.note) : '';
+      translated = true;
+    }
+    this.setState(s => {
+      const t = { ...s.task, status: 'report_submitted' };
+      t.report = { answers: { ...s.submit.answers }, shortAnswer: s.submit.shortAnswer, shortAnswerEn, note: s.submit.note, noteEn, translated, photoTaken: s.submit.photoTaken, submittedAt: this.formatNow() };
+      t.timeline = [...s.task.timeline, { t: this.formatNow(), text: 'May submitted a report' }];
+      return { task: t, caregiverScreen: 'today', translating: false };
+    });
+  }
+
+  backToToday() { this.setState({ caregiverScreen: 'today' }); }
+
+  renderVals() {
+    const s = this.state;
+    const d = s.draft || this.freshDraft();
+    const task = s.task;
+    const submit = s.submit || this.freshSubmit();
+    const lang = s.caregiverLang === 'id' ? 'id' : 'en';
+    const L = I18N[lang];
+
+    const langOptionsForRender = [{ code: 'en', label: 'English' }, { code: 'id', label: 'Bahasa Indonesia' }].map(o => ({
+      ...o, selected: o.code === s.caregiverLang,
+      rowStyle: o.code === s.caregiverLang
+        ? "display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:#DEF3F0;color:#1F9686;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer"
+        : "display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:transparent;color:#3A2A20;font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;cursor:pointer",
+    }));
+
+    const categoriesForRender = CATEGORIES.map(c => ({ name: c, chipStyle: chipStyle(c === d.category, '#FF7A50') }));
+    const dateOptionsForRender = ['Today', 'Tomorrow'].map(v => ({ value: v, label: v, checked: d.date === v, pillStyle: chipStyle(d.date === v, '#FF7A50') }));
+    const photoReqOptionsForRender = [{ value: 'required', label: 'Required' }, { value: 'optional', label: 'Optional' }, { value: 'not_needed', label: 'Not needed' }]
+      .map(o => ({ ...o, checked: d.photoReq === o.value, pillStyle: chipStyle(d.photoReq === o.value, '#FF7A50') }));
+
+    const stepsForRender = d.steps.map((text, i) => ({ idx: i, idx1: i + 1, text, showRemove: d.steps.length > 1 }));
+    const suggestedForRender = SUGGESTED.map(sg => ({ key: sg.key, label: sg.label, chipStyle: chipStyle(d.ynSelected[sg.key], '#FF7A50') }));
+
+    const reportSummaryForRender = buildReportSummary({
+      photoReq: d.photoReq, askNote: d.askNote,
+      questions: [
+        ...SUGGESTED.filter(sg => d.ynSelected[sg.key]).map(() => ({ type: 'yn' })),
+        ...(d.shortAnswerOn ? [{ type: 'short' }] : []),
+      ],
+    });
+
+    const taskView = task ? {
+      ...task,
+      statusLabel: STATUS_META[task.status].label,
+      statusLabelCg: STATUS_LABEL_ID[task.status][lang],
+      statusBg: STATUS_META[task.status].bg,
+      statusColor: STATUS_META[task.status].color,
+      photoRequired: task.photoReq === 'required',
+      stepsDisplay: task.steps.map((t, i) => ({ idx: i + 1, text: t })),
+      timelineForRender: task.timeline.map((e, i) => ({ idx: i, ...e })),
+      reportSummaryDisplay: buildReportSummary(task),
+      reportSummaryDisplayCg: buildReportSummaryI18n(task, L),
+      report: task.report ? { ...task.report, noteDisplay: task.report.noteEn || task.report.note } : null,
+    } : null;
+
+    const hasTask = !!task;
+    const noTask = !task;
+    const hasBanner = !!task && task.status === 'report_submitted';
+    const showRecent = !!task && task.status === 'completed';
+    const showCreateButton = !task || task.status === 'completed';
+    const showCareRecordButton = !!task && task.status === 'completed';
+    const hasCompletedTask = !!task && task.status === 'completed';
+
+    const cgShowEmpty = !task;
+    const cgShowNext = !!task && (task.status === 'upcoming' || task.status === 'viewed' || task.status === 'in_progress');
+    const cgShowWaiting = !!task && task.status === 'report_submitted';
+    const cgShowCompleted = !!task && task.status === 'completed';
+    const cgNextLabel = (task && task.status === 'in_progress') ? L.continueTask : L.viewTask;
+    const cg = {
+      today: L.today, dateline: L.dateline, empty: L.emptyToday,
+      nextTaskKicker: L.nextTask, photoRequired: L.photoRequired,
+      waitingText: L.waitingReview, completedTodayKicker: L.completedToday,
+      confirmedText: task ? `${L.confirmedBy} ${task.completedAt}` : '',
+      stepByStep: L.stepByStep, afterCompleting: L.afterCompleting, startTask: L.startTask,
+      taskInProgress: L.taskInProgress, completeAndReport: L.completeAndReport,
+      taskReport: L.taskReport, completionPhoto: L.completionPhoto, takePhoto: L.takePhoto, retake: L.retake,
+      shortAnswerPlaceholder: L.shortAnswerPlaceholder, anythingElse: L.anythingElse, notePlaceholder: L.notePlaceholder,
+      confirmCheckbox: L.confirmCheckbox, reviewReport: L.reviewReport, note: L.note,
+      editReport: L.editReport, submitReport: L.submitReport,
+      translatingLabel: L.translating, translateFailedLabel: L.translateFailed, retryLabel: L.retry,
+    };
+
+    const idReady = !!task && task.id_ready && lang === 'id';
+    const cgTask = task ? {
+      ...task,
+      title: idReady && task.title_id ? task.title_id : task.title,
+      description: idReady && task.description_id ? task.description_id : task.description,
+      note: idReady && task.note_id !== undefined ? task.note_id : task.note,
+      steps: idReady && task.steps_id ? task.steps_id : task.steps,
+    } : null;
+    if (cgTask) {
+      cgTask.stepsDisplay = cgTask.steps.map((txt, i) => ({ idx: i + 1, text: txt }));
+      cgTask.questions = task.questions.map((q, i) => ({ ...q, label: (idReady && task.questions_id && task.questions_id[i]) ? task.questions_id[i] : q.label }));
+    }
+
+    const stepsChecklist = task ? task.steps.map((t, i) => ({
+      idx: i, text: cgTask.steps[i] !== undefined ? cgTask.steps[i] : t, done: task.stepsDone[i],
+      boxStyle: boxStyle(task.stepsDone[i], '#2FB6A6'), checkColor: task.stepsDone[i] ? '#fff' : 'transparent',
+    })) : [];
+    const allStepsDone = task ? (task.stepsDone.length > 0 && task.stepsDone.every(Boolean)) : false;
+
+    const taskPhotoOn = !!task && task.photoReq !== 'not_needed';
+    const taskAskNote = !!task && task.askNote;
+
+    const questionsForRender = task ? cgTask.questions.map(q => q.type === 'yn' ? {
+      key: q.key, label: q.label, isYn: true, isShort: false,
+      yesChecked: submit.answers[q.key] === 'Yes', noChecked: submit.answers[q.key] === 'No', notSureChecked: submit.answers[q.key] === 'Not sure',
+      yesStyle: chipStyle(submit.answers[q.key] === 'Yes', '#2FB6A6'), noStyle: chipStyle(submit.answers[q.key] === 'No', '#2FB6A6'), notSureStyle: chipStyle(submit.answers[q.key] === 'Not sure', '#2FB6A6'),
+      yesLabel: L.yes, noLabel: L.no, notSureLabel: L.notSure,
+    } : { key: q.key, label: q.label, isYn: false, isShort: true }) : [];
+
+    const canReviewReport = !!task && (task.photoReq !== 'required' || submit.photoTaken)
+      && task.questions.filter(q => q.type === 'yn').every(q => !!submit.answers[q.key])
+      && submit.confirmed;
+
+    const answerLabel = (v) => v === 'Yes' ? L.yes : v === 'No' ? L.no : v === 'Not sure' ? L.notSure : (v || '—');
+    const reviewAnswers = task ? cgTask.questions.map(q => ({ key: q.key, label: q.label, value: q.type === 'yn' ? answerLabel(submit.answers[q.key]) : (submit.shortAnswer || '(no answer)') })) : [];
+    const familyReportAnswers = (task && task.report) ? task.questions.map(q => ({ key: q.key, label: q.label, value: q.type === 'yn' ? (task.report.answers[q.key] || '—') : (task.report.shortAnswerEn || task.report.shortAnswer || '(no answer)') })) : [];
+
+    return {
+      isFamilyHome: s.familyScreen === 'home', isFamilyWizard: s.familyScreen === 'wizard',
+      isFamilyDetail: s.familyScreen === 'detail', isFamilyReport: s.familyScreen === 'report', isFamilyLog: s.familyScreen === 'log',
+      isStep1: s.wizardStep === 1, isStep2: s.wizardStep === 2, isStep3: s.wizardStep === 3, isStep4: s.wizardStep === 4,
+      isCgToday: s.caregiverScreen === 'today', isCgDetail: s.caregiverScreen === 'detail', isCgProgress: s.caregiverScreen === 'progress',
+      isCgSubmit: s.caregiverScreen === 'submit', isCgReview: s.caregiverScreen === 'review',
+
+      hasTask, noTask, hasBanner, showRecent, showCreateButton, showCareRecordButton, hasCompletedTask, noCompletedTask: !hasCompletedTask,
+      task: taskView,
+
+      draftTitle: d.title, draftDate: d.date, draftTime: d.time, draftDescription: d.description, draftNote: d.note,
+      draftNoteOn: !!d.note, draftRefPhotoAdded: d.refPhotoAdded, noRefPhoto: !d.refPhotoAdded,
+      draftAskNote: d.askNote, draftShortAnswerOn: d.shortAnswerOn,
+      categoriesForRender, dateOptionsForRender, photoReqOptionsForRender, stepsForRender, suggestedForRender, reportSummaryForRender,
+
+      cgShowEmpty, cgShowNext, cgShowWaiting, cgShowCompleted, cgNextLabel,
+      stepsChecklist, submitDisabled: !allStepsDone,
+      progressBtnStyle: btnStyle('#2FB6A6', !allStepsDone),
+      taskPhotoOn, taskAskNote,
+      submitPhotoTaken: submit.photoTaken, submitPhotoNotTaken: !submit.photoTaken,
+      submitShortAnswer: submit.shortAnswer, submitNote: submit.note, submitConfirmed: submit.confirmed,
+      askNoteBoxStyle: boxStyle(d.askNote, '#FF7A50'), askNoteCheckColor: d.askNote ? '#fff' : 'transparent',
+      shortAnswerBoxStyle: boxStyle(d.shortAnswerOn, '#FF7A50'), shortAnswerCheckColor: d.shortAnswerOn ? '#fff' : 'transparent',
+      confirmedBoxStyle: boxStyle(submit.confirmed, '#2FB6A6'), confirmedCheckColor: submit.confirmed ? '#fff' : 'transparent',
+      questionsForRender, reviewDisabled: !canReviewReport, reviewBtnStyle: btnStyle('#2FB6A6', !canReviewReport), reviewAnswers, familyReportAnswers,
+      next1BtnStyle: btnStyle('#FF7A50', d.title.trim() === ''),
+
+      cg, cgTask, langMenuOpen: s.langMenuOpen, langOptionsForRender,
+      taskTranslating: !!s.taskTranslating,
+      showTaskTranslating: lang === 'id' && !!task && !idReady && !!s.taskTranslating,
+      showTaskTranslateFailed: lang === 'id' && !!task && !idReady && !!task.translateFailed && !s.taskTranslating,
+      translating: s.translating,
+      submitReportLabel: s.translating ? (lang === 'id' ? 'Menerjemahkan...' : 'Translating...') : L.submitReport,
+      reportTranslated: !!(task && task.report && task.report.translated),
+    };
+  }
+
+  render() {
+    const v = this.renderVals();
+    const active = document.activeElement;
+    const activeField = active && active.dataset ? active.dataset.field : null;
+    const selStart = active && typeof active.selectionStart === 'number' ? active.selectionStart : null;
+    const selEnd = active && typeof active.selectionEnd === 'number' ? active.selectionEnd : null;
+
+    document.getElementById('familyPane').innerHTML = renderFamily(v);
+    document.getElementById('caregiverPane').innerHTML = renderCaregiver(v);
+
+    if (activeField) {
+      const el = document.querySelector(`[data-field="${activeField}"]`);
+      if (el) {
+        el.focus();
+        if (selStart != null && el.setSelectionRange) { try { el.setSelectionRange(selStart, selEnd); } catch (e) {} }
+      }
+    }
+  }
+}
+
+// ---------- Family (Alex) templates ----------
+
+function familyHome(v) {
+  return `<div style="padding:56px 22px 32px;display:flex;flex-direction:column;gap:22px">
+    <div>
+      <div style="font-family:'Baloo 2',sans-serif;font-size:26px;font-weight:700">Good morning, Alex</div>
+      <div style="font-size:14px;color:#8C7A6B;margin-top:4px">Max's care overview</div>
+    </div>
+    ${v.hasBanner ? `
+    <div style="background:#fff;border-radius:20px;padding:18px 20px;box-shadow:0 10px 28px rgba(58,42,32,0.12);display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:14px;background:#FF7A50;flex-shrink:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 10A6 6 0 0 1 18 10V14L20 17H4L6 14Z" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 20A2 2 0 0 0 14 20" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></span>
+        <div>
+          <div style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#E85A34">Needs your attention</div>
+          <div style="font-family:'Baloo 2',sans-serif;font-size:17px;font-weight:700;color:#3A2A20">Report ready for review</div>
+        </div>
+      </div>
+      <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#6B5A4A;margin:0">${esc(v.task.title)} · Submitted at ${v.task.report.submittedAt}</p>
+      <button type="button" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border:none;border-radius:999px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:#fff;background:#FF7A50;cursor:pointer;margin-top:6px" onclick="app.openReportReview()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="12" height="17" rx="2" stroke="#fff" stroke-width="2"/><rect x="9" y="2" width="6" height="3" rx="1" stroke="#fff" stroke-width="2"/><path d="M9 11H15M9 15H15" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>Review Report</button>
+    </div>` : ''}
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#E85A34;margin-bottom:8px">Today's Care</div>
+      ${v.hasTask ? `
+      <div style="background:#fff;border-radius:20px;padding:16px 18px;box-shadow:0 6px 18px rgba(58,42,32,0.08);cursor:pointer" onclick="app.openFamilyDetail()">
+        <div style="font-family:'Baloo 2',sans-serif;font-size:17px;font-weight:700;color:#3A2A20">${esc(v.task.title)}</div>
+        <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#6B5A4A;margin:4px 0 0">${v.task.time} · For Max</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:${v.task.statusBg};color:${v.task.statusColor};font-family:'Nunito',sans-serif;font-weight:800;font-size:12px"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${v.task.statusColor}"></span>${v.task.statusLabel}</span>
+          ${v.task.photoRequired ? `<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:#FFF3D0;color:#8A6A10;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 8H8L10 5H14L16 8H20A1 1 0 0 1 21 9V18A1 1 0 0 1 20 19H4A1 1 0 0 1 3 18V9A1 1 0 0 1 4 8Z" stroke="#8A6A10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.2" stroke="#8A6A10" stroke-width="2"/></svg>Photo required</span>` : ''}
+        </div>
+      </div>` : `<p style="font-family:'Nunito',sans-serif;font-size:14px;color:#8C7A6B">No tasks yet today.</p>`}
+    </div>
+    ${v.showRecent ? `
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#E85A34;margin-bottom:8px">Recent Updates</div>
+      <div style="background:#fff;border-radius:20px;padding:16px 18px;box-shadow:0 6px 18px rgba(58,42,32,0.08);cursor:pointer" onclick="app.goCareLog()">
+        <div style="font-family:'Baloo 2',sans-serif;font-size:17px;font-weight:700;color:#3A2A20">${esc(v.task.title)}</div>
+        <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#6B5A4A;margin:4px 0 0">Completed at ${v.task.completedAt}</p>
+      </div>
+    </div>` : ''}
+    ${v.showCreateButton ? `<button type="button" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:15px;border:none;border-radius:999px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:#fff;background:#FF7A50;cursor:pointer" onclick="app.startCreateTask()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>Create Task</button>` : ''}
+  </div>`;
+}
+
+function familyWizard(v) {
+  let step = '';
+  if (v.isStep1) {
+    step = `
+    <div style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#E85A34">1 of 4 · Task Details</div>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Task name</label><input data-field="draftTitle" style="width:100%;box-sizing:border-box;padding:13px 15px;border-radius:14px;border:2px solid #F0E4D3;background:#FFFDF8;font-family:'Nunito',sans-serif;font-size:15px;color:#3A2A20;outline:none" placeholder="e.g. Change wound dressing" value="${esc(v.draftTitle)}" oninput="app.updateTitle(this.value)"/></div>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Date</label>
+      <div style="display:flex;gap:8px">
+        ${v.dateOptionsForRender.map(opt => `<label style="position:relative"><input type="radio" name="draft-date" ${opt.checked ? 'checked' : ''} onchange="app.setDate('${opt.value}')" style="position:absolute;opacity:0;width:0;height:0"/><span style="${opt.pillStyle}">${opt.label}</span></label>`).join('')}
+      </div>
+    </div>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Time</label><input data-field="draftTime" style="width:100%;box-sizing:border-box;padding:13px 15px;border-radius:14px;border:2px solid #F0E4D3;background:#FFFDF8;font-family:'Nunito',sans-serif;font-size:15px;color:#3A2A20;outline:none" value="${esc(v.draftTime)}" oninput="app.updateTime(this.value)"/></div>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Category (optional)</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${v.categoriesForRender.map(cat => `<span style="${cat.chipStyle}" onclick="app.toggleCategory('${cat.name}')">${cat.name}</span>`).join('')}
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button type="button" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:14px;border-radius:999px;border:2px solid #FF7A50;background:#fff;color:#E85A34;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer" onclick="app.goHome()">Cancel</button>
+      <button type="button" style="flex:1;${v.next1BtnStyle}" onclick="app.wizardNext()">Next</button>
+    </div>`;
+  } else if (v.isStep2) {
+    step = `
+    <div style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#E85A34">2 of 4 · Instructions</div>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">What needs to be done?</label><textarea data-field="draftDescription" rows="2" style="width:100%;box-sizing:border-box;padding:13px 15px;border-radius:14px;border:2px solid #F0E4D3;background:#FFFDF8;font-family:'Nunito',sans-serif;font-size:15px;color:#3A2A20;outline:none" oninput="app.updateDescription(this.value)">${esc(v.draftDescription)}</textarea></div>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Step-by-step instructions</label>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${v.stepsForRender.map(st => `<div style="display:flex;gap:8px;align-items:center">
+          <span style="font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;color:#B0947A;width:14px">${st.idx1}</span>
+          <input data-field="draftStep-${st.idx}" style="flex:1;box-sizing:border-box;padding:12px 14px;border-radius:14px;border:2px solid #F0E4D3;background:#FFFDF8;font-family:'Nunito',sans-serif;font-size:14px;color:#3A2A20;outline:none" value="${esc(st.text)}" oninput="app.updateStepText(${st.idx}, this.value)"/>
+          ${st.showRemove ? `<button type="button" aria-label="Remove" style="width:32px;height:32px;border-radius:50%;border:none;background:#FFE9DE;color:#E85A34;font-weight:800;cursor:pointer;flex-shrink:0" onclick="app.removeStep(${st.idx})">×</button>` : ''}
+        </div>`).join('')}
+      </div>
+      <button type="button" style="margin-top:10px;padding:10px 16px;border-radius:999px;border:2px solid #F0E4D3;background:#fff;color:#8C7A6B;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer" onclick="app.addStep()">+ Add step</button>
+    </div>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Important note</label><textarea data-field="draftNote" rows="2" style="width:100%;box-sizing:border-box;padding:13px 15px;border-radius:14px;border:2px solid #F0E4D3;background:#FFFDF8;font-family:'Nunito',sans-serif;font-size:15px;color:#3A2A20;outline:none" oninput="app.updateNote(this.value)">${esc(v.draftNote)}</textarea></div>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Reference photo</label>
+      ${v.draftRefPhotoAdded ? photoBox('Reference photo', 140) : `<button type="button" style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-radius:999px;border:2px solid #F0E4D3;background:#fff;color:#8C7A6B;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer" onclick="app.toggleRefPhoto()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 8H8L10 5H14L16 8H20A1 1 0 0 1 21 9V18A1 1 0 0 1 20 19H4A1 1 0 0 1 3 18V9A1 1 0 0 1 4 8Z" stroke="#8C7A6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.2" stroke="#8C7A6B" stroke-width="2"/></svg>Add Reference Photo</button>`}
+    </div>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button type="button" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:14px;border-radius:999px;border:2px solid #FF7A50;background:#fff;color:#E85A34;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer" onclick="app.wizardBack()">Back</button>
+      <button type="button" style="flex:1;width:auto;display:flex;align-items:center;justify-content:center;gap:6px;padding:14px;border:none;border-radius:999px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:#fff;background:#FF7A50;cursor:pointer" onclick="app.wizardNext()">Next</button>
+    </div>`;
+  } else if (v.isStep3) {
+    step = `
+    <div style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#E85A34">3 of 4 · Report Requirements</div>
+    <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#8C7A6B;margin:0">Choose what May needs to report.</p>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Completion photo</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${v.photoReqOptionsForRender.map(opt => `<label style="position:relative"><input type="radio" name="draft-photo-req" ${opt.checked ? 'checked' : ''} onchange="app.setPhotoReq('${opt.value}')" style="position:absolute;opacity:0;width:0;height:0"/><span style="${opt.pillStyle}">${opt.label}</span></label>`).join('')}
+      </div>
+    </div>
+    <label style="position:relative;display:flex;gap:12px;align-items:center;cursor:pointer"><input type="checkbox" ${v.draftAskNote ? 'checked' : ''} onchange="app.toggleAskNote()" style="position:absolute;opacity:0;width:0;height:0"/><span style="${v.askNoteBoxStyle}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13L10 18L19 7" stroke="${v.askNoteCheckColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="font-family:'Nunito',sans-serif;font-size:14px;color:#3A2A20">Ask for a short note</span></label>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Suggested questions</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${v.suggestedForRender.map(q => `<span style="${q.chipStyle}" onclick="app.toggleSuggested('${q.key}')">${q.label}</span>`).join('')}
+      </div>
+    </div>
+    <label style="position:relative;display:flex;gap:12px;align-items:center;cursor:pointer"><input type="checkbox" ${v.draftShortAnswerOn ? 'checked' : ''} onchange="app.toggleShortAnswer()" style="position:absolute;opacity:0;width:0;height:0"/><span style="${v.shortAnswerBoxStyle}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13L10 18L19 7" stroke="${v.shortAnswerCheckColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="font-family:'Nunito',sans-serif;font-size:14px;color:#3A2A20">Ask "How does Max feel?"</span></label>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button type="button" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:14px;border-radius:999px;border:2px solid #FF7A50;background:#fff;color:#E85A34;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer" onclick="app.wizardBack()">Back</button>
+      <button type="button" style="flex:1;width:auto;display:flex;align-items:center;justify-content:center;gap:6px;padding:14px;border:none;border-radius:999px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:#fff;background:#FF7A50;cursor:pointer" onclick="app.wizardNext()">Next</button>
+    </div>`;
+  } else if (v.isStep4) {
+    step = `
+    <div style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#E85A34">4 of 4 · Review</div>
+    <div style="background:#fff;border-radius:20px;padding:16px 18px;box-shadow:0 6px 18px rgba(58,42,32,0.08)">
+      <div style="font-family:'Baloo 2',sans-serif;font-size:17px;font-weight:700;color:#3A2A20">${esc(v.draftTitle)}</div>
+      <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#6B5A4A;margin:4px 0 0">${v.draftDate} at ${v.draftTime} · For Max</p>
+    </div>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Instructions</label>
+      <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#6B5A4A;white-space:pre-wrap;margin:0 0 6px">${esc(v.draftDescription)}</p>
+      <ol style="padding-left:18px;font-family:'Nunito',sans-serif;font-size:14px;color:#3A2A20;display:flex;flex-direction:column;gap:4px;margin:0">
+        ${v.stepsForRender.map(st => `<li>${esc(st.text)}</li>`).join('')}
+      </ol>
+      ${v.draftNoteOn ? `<p style="display:flex;gap:6px;align-items:flex-start;font-family:'Nunito',sans-serif;font-size:13px;color:#E85A34;margin:8px 0 0"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><path d="M12 3L22 20H2Z" stroke="#E85A34" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 9V14M12 17H12.01" stroke="#E85A34" stroke-width="2" stroke-linecap="round"/></svg>${esc(v.draftNote)}</p>` : ''}
+    </div>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">May will need to</label>
+      <ul style="padding-left:18px;font-family:'Nunito',sans-serif;font-size:14px;color:#3A2A20;display:flex;flex-direction:column;gap:4px;margin:0">
+        ${v.reportSummaryForRender.map(r => `<li>${r.text}</li>`).join('')}
+      </ul>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button type="button" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:14px;border-radius:999px;border:2px solid #FF7A50;background:#fff;color:#E85A34;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer" onclick="app.wizardBack()">Back</button>
+      <button type="button" style="flex:1;width:auto;display:flex;align-items:center;justify-content:center;gap:6px;padding:14px;border:none;border-radius:999px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:#fff;background:#FF7A50;cursor:pointer" onclick="app.publishTask()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13L10 18L19 7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Publish Task</button>
+    </div>`;
+  }
+  return `<div style="padding:56px 22px 40px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="font-family:'Baloo 2',sans-serif;font-size:22px;font-weight:700">Create Task</div>
+      <button type="button" style="border:none;background:transparent;color:#B0947A;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer" onclick="app.goHome()">Cancel</button>
+    </div>
+    ${step}
+  </div>`;
+}
+
+function familyDetail(v) {
+  const t = v.task;
+  return `<div style="padding:56px 22px 32px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <button type="button" onclick="app.goHome()" style="border:none;background:transparent;padding:0;cursor:pointer"><span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:12px;background:#F5EAD9"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 5L8 12L15 19" stroke="#8C6A4A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:${t.statusBg};color:${t.statusColor};font-family:'Nunito',sans-serif;font-weight:800;font-size:12px"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${t.statusColor}"></span>${t.statusLabel}</span>
+    </div>
+    <div>
+      <div style="font-family:'Baloo 2',sans-serif;font-size:22px;font-weight:700">${esc(t.title)}</div>
+      <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#8C7A6B;margin-top:4px">${t.date} at ${t.time} · For Max · Caregiver: May</p>
+    </div>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Instructions</label>
+      <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#6B5A4A;margin:0 0 6px">${esc(t.description)}</p>
+      <ol style="padding-left:18px;font-family:'Nunito',sans-serif;font-size:14px;color:#3A2A20;display:flex;flex-direction:column;gap:4px;margin:0">
+        ${t.stepsDisplay.map(st => `<li>${esc(st.text)}</li>`).join('')}
+      </ol>
+      ${t.note ? `<p style="display:flex;gap:6px;align-items:flex-start;font-family:'Nunito',sans-serif;font-size:13px;color:#E85A34;margin:8px 0 0"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><path d="M12 3L22 20H2Z" stroke="#E85A34" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 9V14M12 17H12.01" stroke="#E85A34" stroke-width="2" stroke-linecap="round"/></svg>${esc(t.note)}</p>` : ''}
+    </div>
+    ${t.refPhotoAdded ? photoBox('Reference photo', 130) : ''}
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Report required</label>
+      <ul style="padding-left:18px;font-family:'Nunito',sans-serif;font-size:14px;color:#3A2A20;display:flex;flex-direction:column;gap:4px;margin:0">
+        ${t.reportSummaryDisplay.map(r => `<li>${r.text}</li>`).join('')}
+      </ul>
+    </div>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Progress</label>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${t.timelineForRender.map(ev => `<div style="font-family:'Nunito',sans-serif;font-size:13px;color:#3A2A20"><span style="color:#B0947A">${ev.t}</span> — ${ev.text}</div>`).join('')}
+      </div>
+    </div>
+    ${v.hasBanner ? `<button type="button" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:15px;border:none;border-radius:999px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:#fff;background:#FF7A50;cursor:pointer" onclick="app.openReportReview()">Review Report</button>` : ''}
+    ${v.showCareRecordButton ? `<button type="button" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:15px;border-radius:999px;border:2px solid #FF7A50;background:#fff;color:#E85A34;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer" onclick="app.goCareLog()">View Care Record</button>` : ''}
+  </div>`;
+}
+
+function familyReport(v) {
+  const t = v.task;
+  return `<div style="padding:56px 22px 32px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <button type="button" onclick="app.openFamilyDetail()" style="border:none;background:transparent;padding:0;cursor:pointer"><span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:12px;background:#F5EAD9"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 5L8 12L15 19" stroke="#8C6A4A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+      <span style="font-family:'Baloo 2',sans-serif;font-size:17px;font-weight:700">Care Report</span>
+      <span style="width:34px"></span>
+    </div>
+    <div style="background:#fff;border-radius:20px;padding:16px 18px;box-shadow:0 6px 18px rgba(58,42,32,0.08)">
+      <div style="font-family:'Baloo 2',sans-serif;font-size:17px;font-weight:700;color:#3A2A20">${esc(t.title)}</div>
+      <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#6B5A4A;margin:4px 0 0">Completed by May · ${t.report.submittedAt}</p>
+      ${v.reportTranslated ? `<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:#DEF3F0;color:#1F9686;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;margin-top:8px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#1F9686" stroke-width="2"/><path d="M3 12H21M12 3C14.5 6 14.5 18 12 21M12 3C9.5 6 9.5 18 12 21" stroke="#1F9686" stroke-width="2"/></svg>Translated from Bahasa Indonesia</span>` : ''}
+    </div>
+    ${t.report.photoTaken ? photoBox('Completion photo', 160) : ''}
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Report answers</label>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${v.familyReportAnswers.map(a => `<div><div style="font-family:'Nunito',sans-serif;font-size:13px;color:#B0947A">${a.label}</div><div style="font-family:'Nunito',sans-serif;font-size:15px;color:#3A2A20">${a.value}</div></div>`).join('')}
+      </div>
+    </div>
+    ${t.report.note ? `<div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Caregiver note</label><p style="font-family:'Nunito',sans-serif;font-size:14px;color:#6B5A4A;margin:0">${t.report.noteDisplay}</p></div>` : ''}
+    <button type="button" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:15px;border:none;border-radius:999px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:#fff;background:#FF7A50;cursor:pointer" onclick="app.confirmCompletion()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13L10 18L19 7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Confirm Completion</button>
+  </div>`;
+}
+
+function familyLog(v) {
+  const t = v.task;
+  return `<div style="padding:56px 22px 32px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <button type="button" onclick="app.goHome()" style="border:none;background:transparent;padding:0;cursor:pointer"><span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:12px;background:#F5EAD9"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 5L8 12L15 19" stroke="#8C6A4A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+      <span style="font-family:'Baloo 2',sans-serif;font-size:17px;font-weight:700">Care Log</span>
+      <span style="width:34px"></span>
+    </div>
+    ${v.hasCompletedTask ? `
+    <div style="background:#fff;border-radius:20px;padding:16px 18px;box-shadow:0 6px 18px rgba(58,42,32,0.08)">
+      <div style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#3F8A3B">${t.date}</div>
+      <div style="font-family:'Baloo 2',sans-serif;font-size:17px;font-weight:700;color:#3A2A20">${esc(t.title)}</div>
+      <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#6B5A4A;margin:4px 0 8px">Completed by May at ${t.completedAt}</p>
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:#E3F4DE;color:#3F8A3B;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px">Photo attached</span>
+    </div>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Activity timeline</label>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${t.timelineForRender.map(ev => `<div style="font-family:'Nunito',sans-serif;font-size:13px;color:#3A2A20"><span style="color:#B0947A">${ev.t}</span> — ${ev.text}</div>`).join('')}
+      </div>
+    </div>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B0947A;margin-bottom:7px">Confirmation</label><p style="font-family:'Nunito',sans-serif;font-size:14px;color:#6B5A4A;margin:0">Confirmed by Alex · ${t.completedAt}</p></div>
+    <button type="button" style="width:100%;padding:14px;border-radius:999px;border:2px solid #F0E4D3;background:#fff;color:#8C7A6B;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer" onclick="app.resetAll()">Start a new demo task</button>
+    ` : `<p style="font-family:'Nunito',sans-serif;font-size:14px;color:#8C7A6B">No completed records yet.</p>`}
+  </div>`;
+}
+
+function renderFamily(v) {
+  if (v.isFamilyWizard) return `<div style="min-height:100%;background:#FDF6EC;box-sizing:border-box">${familyWizard(v)}</div>`;
+  if (v.isFamilyDetail) return `<div style="min-height:100%;background:#FDF6EC;box-sizing:border-box">${familyDetail(v)}</div>`;
+  if (v.isFamilyReport) return `<div style="min-height:100%;background:#FDF6EC;box-sizing:border-box">${familyReport(v)}</div>`;
+  if (v.isFamilyLog) return `<div style="min-height:100%;background:#FDF6EC;box-sizing:border-box">${familyLog(v)}</div>`;
+  return `<div style="min-height:100%;background:#FDF6EC;box-sizing:border-box">${familyHome(v)}</div>`;
+}
+
+// ---------- Caregiver (May) templates ----------
+
+function langMenu(v) {
+  if (!v.langMenuOpen) return '';
+  return `<div style="position:absolute;top:44px;right:0;background:#fff;border-radius:16px;padding:8px;box-shadow:0 10px 28px rgba(58,42,32,0.16);z-index:30;min-width:180px;display:flex;flex-direction:column;gap:2px">
+    ${v.langOptionsForRender.map(o => `<div style="${o.rowStyle}" onclick="app.setCaregiverLang('${o.code}')">${o.label}</div>`).join('')}
+  </div>`;
+}
+
+function cgToday(v) {
+  const t = v.task;
+  return `<div style="padding:56px 22px 32px;display:flex;flex-direction:column;gap:22px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;position:relative">
+      <div>
+        <div style="font-family:'Baloo 2',sans-serif;font-size:26px;font-weight:700">${v.cg.today}</div>
+        <div style="font-size:14px;color:#8C7A6B;margin-top:4px">${v.cg.dateline}</div>
+      </div>
+      <div style="position:relative">
+        <button type="button" onclick="app.toggleLangMenu()" aria-label="Language" style="border:none;background:#DEF3F0;width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#1F9686" stroke-width="2"/><path d="M3 12H21M12 3C14.5 6 14.5 18 12 21M12 3C9.5 6 9.5 18 12 21" stroke="#1F9686" stroke-width="2"/></svg></button>
+        ${langMenu(v)}
+      </div>
+    </div>
+    ${v.cgShowEmpty ? `<p style="font-family:'Nunito',sans-serif;font-size:14px;color:#8C7A6B">${v.cg.empty}</p>` : ''}
+    ${v.cgShowNext ? `
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#1F9686;margin-bottom:8px">${v.cg.nextTaskKicker}</div>
+      <div style="background:#fff;border-radius:20px;padding:16px 18px;box-shadow:0 6px 18px rgba(58,42,32,0.08)">
+        <div style="font-family:'Baloo 2',sans-serif;font-size:17px;font-weight:700;color:#3A2A20">${esc(v.cgTask.title)}</div>
+        ${v.showTaskTranslating ? `<p style="font-family:'Nunito',sans-serif;font-size:12px;font-style:italic;color:#8CA39F;margin:4px 0 0">${v.cg.translatingLabel}</p>` : ''}
+        ${v.showTaskTranslateFailed ? `<p style="font-family:'Nunito',sans-serif;font-size:12px;color:#E85A34;margin:4px 0 0">${v.cg.translateFailedLabel} <span style="text-decoration:underline;cursor:pointer" onclick="app.retryTranslate()">${v.cg.retryLabel}</span></p>` : ''}
+        <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#6B5A4A;margin:4px 0 0">${t.time}</p>
+        ${t.photoRequired ? `<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:#FFF3D0;color:#8A6A10;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;margin-top:8px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 8H8L10 5H14L16 8H20A1 1 0 0 1 21 9V18A1 1 0 0 1 20 19H4A1 1 0 0 1 3 18V9A1 1 0 0 1 4 8Z" stroke="#8A6A10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.2" stroke="#8A6A10" stroke-width="2"/></svg>${v.cg.photoRequired}</span>` : ''}
+        <button type="button" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border:none;border-radius:999px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:#fff;background:#2FB6A6;cursor:pointer;margin-top:12px" onclick="app.openCaregiverDetail()">${v.cgNextLabel}</button>
+      </div>
+    </div>` : ''}
+    ${v.cgShowWaiting ? `
+    <div style="background:#fff;border-radius:20px;padding:16px 18px;box-shadow:0 6px 18px rgba(58,42,32,0.08)">
+      <div style="font-family:'Baloo 2',sans-serif;font-size:17px;font-weight:700;color:#3A2A20">${esc(v.cgTask.title)}</div>
+      <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#6B5A4A;margin:4px 0 10px">${v.cg.waitingText}</p>
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:${t.statusBg};color:${t.statusColor};font-family:'Nunito',sans-serif;font-weight:800;font-size:12px"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${t.statusColor}"></span>${t.statusLabelCg}</span>
+    </div>` : ''}
+    ${v.cgShowCompleted ? `
+    <div>
+      <div style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#1F9686;margin-bottom:8px">${v.cg.completedTodayKicker}</div>
+      <div style="background:#fff;border-radius:20px;padding:16px 18px;box-shadow:0 6px 18px rgba(58,42,32,0.08)">
+        <div style="font-family:'Baloo 2',sans-serif;font-size:17px;font-weight:700;color:#3A2A20">${esc(v.cgTask.title)}</div>
+        <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#6B5A4A;margin:4px 0 0">${v.cg.confirmedText}</p>
+      </div>
+    </div>` : ''}
+  </div>`;
+}
+
+function cgDetail(v) {
+  const t = v.task;
+  return `<div style="padding:56px 22px 32px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <button type="button" onclick="app.backToToday()" style="border:none;background:transparent;padding:0;cursor:pointer"><span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:12px;background:#DEF3F0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 5L8 12L15 19" stroke="#2E9691" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:${t.statusBg};color:${t.statusColor};font-family:'Nunito',sans-serif;font-weight:800;font-size:12px"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${t.statusColor}"></span>${t.statusLabelCg}</span>
+        <div style="position:relative">
+          <button type="button" onclick="app.toggleLangMenu()" aria-label="Language" style="border:none;background:#DEF3F0;width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#1F9686" stroke-width="2"/><path d="M3 12H21M12 3C14.5 6 14.5 18 12 21M12 3C9.5 6 9.5 18 12 21" stroke="#1F9686" stroke-width="2"/></svg></button>
+          ${langMenu(v)}
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="font-family:'Baloo 2',sans-serif;font-size:22px;font-weight:700">${esc(v.cgTask.title)}</div>
+      ${v.showTaskTranslating ? `<p style="font-family:'Nunito',sans-serif;font-size:12px;font-style:italic;color:#8CA39F;margin:4px 0 0">${v.cg.translatingLabel}</p>` : ''}
+      ${v.showTaskTranslateFailed ? `<p style="font-family:'Nunito',sans-serif;font-size:12px;color:#E85A34;margin:4px 0 0">${v.cg.translateFailedLabel} <span style="text-decoration:underline;cursor:pointer" onclick="app.retryTranslate()">${v.cg.retryLabel}</span></p>` : ''}
+      <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#8C7A6B;margin-top:4px">${t.date} at ${t.time}</p>
+    </div>
+    <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#6B5A4A;margin:0">${esc(v.cgTask.description)}</p>
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#8CA39F;margin-bottom:7px">${v.cg.stepByStep}</label>
+      <ol style="padding-left:18px;font-family:'Nunito',sans-serif;font-size:15px;color:#3A2A20;display:flex;flex-direction:column;gap:6px;margin:0">
+        ${v.cgTask.stepsDisplay.map(st => `<li>${esc(st.text)}</li>`).join('')}
+      </ol>
+    </div>
+    ${v.cgTask.note ? `<p style="display:flex;gap:6px;align-items:flex-start;font-family:'Nunito',sans-serif;font-size:13px;color:#E85A34;margin:0"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><path d="M12 3L22 20H2Z" stroke="#E85A34" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 9V14M12 17H12.01" stroke="#E85A34" stroke-width="2" stroke-linecap="round"/></svg>${esc(v.cgTask.note)}</p>` : ''}
+    ${t.refPhotoAdded ? photoBox('Reference photo', 130) : ''}
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#8CA39F;margin-bottom:7px">${v.cg.afterCompleting}</label>
+      <ul style="padding-left:18px;font-family:'Nunito',sans-serif;font-size:14px;color:#3A2A20;display:flex;flex-direction:column;gap:4px;margin:0">
+        ${t.reportSummaryDisplayCg.map(r => `<li>${r.text}</li>`).join('')}
+      </ul>
+    </div>
+    <button type="button" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:15px;border:none;border-radius:999px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:#fff;background:#2FB6A6;cursor:pointer" onclick="app.startTask()">${v.cg.startTask}</button>
+  </div>`;
+}
+
+function cgProgress(v) {
+  return `<div style="padding:56px 22px 32px;display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+      <div>
+        <div style="font-family:'Baloo 2',sans-serif;font-size:22px;font-weight:700">${v.cg.taskInProgress}</div>
+        <p style="font-family:'Nunito',sans-serif;font-size:14px;color:#8C7A6B;margin-top:4px">${esc(v.cgTask.title)}</p>
+      </div>
+      <div style="position:relative;flex-shrink:0">
+        <button type="button" onclick="app.toggleLangMenu()" aria-label="Language" style="border:none;background:#DEF3F0;width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#1F9686" stroke-width="2"/><path d="M3 12H21M12 3C14.5 6 14.5 18 12 21M12 3C9.5 6 9.5 18 12 21" stroke="#1F9686" stroke-width="2"/></svg></button>
+        ${langMenu(v)}
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      ${v.stepsChecklist.map(st => `<label style="position:relative;display:flex;gap:12px;align-items:flex-start;cursor:pointer;background:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 4px 12px rgba(58,42,32,0.06)"><input type="checkbox" ${st.done ? 'checked' : ''} onchange="app.toggleStepDone(${st.idx})" style="position:absolute;opacity:0;width:0;height:0"/><span style="${st.boxStyle}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13L10 18L19 7" stroke="${st.checkColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="font-family:'Nunito',sans-serif;font-size:15px;color:#3A2A20;padding-top:1px">${esc(st.text)}</span></label>`).join('')}
+    </div>
+    <button type="button" style="${v.progressBtnStyle}" ${v.submitDisabled ? 'disabled' : ''} onclick="app.goSubmitReport()">${v.cg.completeAndReport}</button>
+  </div>`;
+}
+
+function cgSubmit(v) {
+  return `<div style="padding:56px 22px 40px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <div style="font-family:'Baloo 2',sans-serif;font-size:22px;font-weight:700">${v.cg.taskReport}</div>
+      <div style="position:relative;flex-shrink:0">
+        <button type="button" onclick="app.toggleLangMenu()" aria-label="Language" style="border:none;background:#DEF3F0;width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#1F9686" stroke-width="2"/><path d="M3 12H21M12 3C14.5 6 14.5 18 12 21M12 3C9.5 6 9.5 18 12 21" stroke="#1F9686" stroke-width="2"/></svg></button>
+        ${langMenu(v)}
+      </div>
+    </div>
+    ${v.taskPhotoOn ? `
+    <div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#8CA39F;margin-bottom:7px">${v.cg.completionPhoto}</label>
+      ${v.submitPhotoTaken ? `${photoBox('Completion photo', 150)}<button type="button" style="margin-top:8px;padding:10px 16px;border-radius:999px;border:2px solid #2FB6A6;background:#fff;color:#1F9686;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer" onclick="app.retakePhoto()">${v.cg.retake}</button>` : `<button type="button" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border-radius:999px;border:2px solid #2FB6A6;background:#fff;color:#1F9686;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer" onclick="app.takePhoto()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 8H8L10 5H14L16 8H20A1 1 0 0 1 21 9V18A1 1 0 0 1 20 19H4A1 1 0 0 1 3 18V9A1 1 0 0 1 4 8Z" stroke="#1F9686" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.2" stroke="#1F9686" stroke-width="2"/></svg>${v.cg.takePhoto}</button>`}
+    </div>` : ''}
+    ${v.questionsForRender.map(q => `<div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#8CA39F;margin-bottom:7px">${q.label}</label>
+      ${q.isYn ? `<div style="display:flex;flex-wrap:wrap;gap:8px">
+        <label style="position:relative"><input type="radio" name="${q.key}" ${q.yesChecked ? 'checked' : ''} onchange="app.setAnswer('${q.key}','Yes')" style="position:absolute;opacity:0;width:0;height:0"/><span style="${q.yesStyle}">${q.yesLabel}</span></label>
+        <label style="position:relative"><input type="radio" name="${q.key}" ${q.noChecked ? 'checked' : ''} onchange="app.setAnswer('${q.key}','No')" style="position:absolute;opacity:0;width:0;height:0"/><span style="${q.noStyle}">${q.noLabel}</span></label>
+        <label style="position:relative"><input type="radio" name="${q.key}" ${q.notSureChecked ? 'checked' : ''} onchange="app.setAnswer('${q.key}','Not sure')" style="position:absolute;opacity:0;width:0;height:0"/><span style="${q.notSureStyle}">${q.notSureLabel}</span></label>
+      </div>` : `<input data-field="submitShortAnswer" style="width:100%;box-sizing:border-box;padding:13px 15px;border-radius:14px;border:2px solid #F0E4D3;background:#FFFDF8;font-family:'Nunito',sans-serif;font-size:15px;color:#3A2A20;outline:none" placeholder="${v.cg.shortAnswerPlaceholder}" value="${esc(v.submitShortAnswer)}" oninput="app.updateShortAnswer(this.value)"/>`}
+    </div>`).join('')}
+    ${v.taskAskNote ? `<div><label style="display:block;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#8CA39F;margin-bottom:7px">${v.cg.anythingElse}</label><textarea data-field="submitNote" rows="2" style="width:100%;box-sizing:border-box;padding:13px 15px;border-radius:14px;border:2px solid #F0E4D3;background:#FFFDF8;font-family:'Nunito',sans-serif;font-size:15px;color:#3A2A20;outline:none" placeholder="${v.cg.notePlaceholder}" oninput="app.updateCaregiverNote(this.value)">${esc(v.submitNote)}</textarea></div>` : ''}
+    <label style="position:relative;display:flex;gap:12px;align-items:center;cursor:pointer"><input type="checkbox" ${v.submitConfirmed ? 'checked' : ''} onchange="app.toggleConfirmed()" style="position:absolute;opacity:0;width:0;height:0"/><span style="${v.confirmedBoxStyle}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13L10 18L19 7" stroke="${v.confirmedCheckColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="font-family:'Nunito',sans-serif;font-size:14px;color:#3A2A20">${v.cg.confirmCheckbox}</span></label>
+    <button type="button" style="${v.reviewBtnStyle}" ${v.reviewDisabled ? 'disabled' : ''} onclick="app.goReviewReport()">${v.cg.reviewReport}</button>
+  </div>`;
+}
+
+function cgReview(v) {
+  return `<div style="padding:56px 22px 32px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <div style="font-family:'Baloo 2',sans-serif;font-size:22px;font-weight:700">${v.cg.reviewReport}</div>
+      <div style="position:relative;flex-shrink:0">
+        <button type="button" onclick="app.toggleLangMenu()" aria-label="Language" style="border:none;background:#DEF3F0;width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#1F9686" stroke-width="2"/><path d="M3 12H21M12 3C14.5 6 14.5 18 12 21M12 3C9.5 6 9.5 18 12 21" stroke="#1F9686" stroke-width="2"/></svg></button>
+        ${langMenu(v)}
+      </div>
+    </div>
+    ${v.submitPhotoTaken ? photoBox('Completion photo', 150) : ''}
+    <div style="display:flex;flex-direction:column;gap:10px">
+      ${v.reviewAnswers.map(a => `<div><div style="font-family:'Nunito',sans-serif;font-size:13px;color:#8CA39F">${a.label}</div><div style="font-family:'Nunito',sans-serif;font-size:15px;color:#3A2A20">${a.value}</div></div>`).join('')}
+    </div>
+    ${v.taskAskNote ? `<div><div style="font-family:'Nunito',sans-serif;font-size:13px;color:#8CA39F">${v.cg.note}</div><div style="font-family:'Nunito',sans-serif;font-size:15px;color:#3A2A20">${esc(v.submitNote)}</div></div>` : ''}
+    <div style="display:flex;gap:10px">
+      <button type="button" style="flex:1;padding:14px;border-radius:999px;border:2px solid #2FB6A6;background:#fff;color:#1F9686;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer" onclick="app.editReport()">${v.cg.editReport}</button>
+      <button type="button" style="flex:1;padding:14px;border:none;border-radius:999px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:#fff;background:#2FB6A6;cursor:pointer" ${v.translating ? 'disabled' : ''} onclick="app.submitReport()">${v.submitReportLabel}</button>
+    </div>
+  </div>`;
+}
+
+function renderCaregiver(v) {
+  let inner;
+  if (v.isCgDetail) inner = cgDetail(v);
+  else if (v.isCgProgress) inner = cgProgress(v);
+  else if (v.isCgSubmit) inner = cgSubmit(v);
+  else if (v.isCgReview) inner = cgReview(v);
+  else inner = cgToday(v);
+  return `<div style="min-height:100%;background:#FDF6EC;box-sizing:border-box">${inner}</div>`;
+}
+
+// ---------- boot ----------
+const app = new App();
+document.getElementById('resetBtn').addEventListener('click', () => app.resetAll());
+app.render();
+</script>
+</body>
+</html>
