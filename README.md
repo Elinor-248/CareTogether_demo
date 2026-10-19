@@ -16,7 +16,7 @@ So we set out to build a product that creates trust — Care Together.
 # Features
 The core features are simple and intuitive:
 
-Task Assignment — Families can create daily care tasks in just seconds
-Cross-Language Communication — The system automatically translates, so caregivers receive tasks in the language they’re most comfortable with
-Automated Care Logs — Every completed task leaves behind a photo and record, so families can check in anytime — and caregivers’ efforts are recognized
-Good care isn’t built on surveillance — it’s built on mutual understanding. Care Together removes language as a barrier, giving families peace of mind and giving caregivers the respect they deserve.
+- Task Assignment — Families can create daily care tasks in just seconds
+- Cross-Language Communication — The system automatically translates, so caregivers receive tasks in the language they’re most comfortable with
+- Automated Care Logs — Every completed task leaves behind a photo and record, so families can check in anytime — and caregivers’ efforts are recognized
+- Good care isn’t built on surveillance — it’s built on mutual understanding. Care Together removes language as a barrier, giving families peace of mind and giving caregivers the respect they deserve.
