@@ -2,7 +2,8 @@
 CareTogether: Bridging the Language Gap in Elder Care
 
 ## Project Background
-This project began at an Entrepreneurship Program we joined in Singapore. Our team was assigned the theme “Caring for Aging Parents” — a problem that sounds familiar at first glance, but is surprisingly hard to define in just a few words. Instead of jumping straight to a solution, we decided to spend time breaking the problem down: Where exactly does elder care fall short? Who are the people on the front lines of caregiving? And what do they actually struggle with every day?
+Caring for aging parents has become a universal challenge worldwide. A critical pain point lies in the communication gap between frontline caregivers and family members—often exacerbated by language barriers. To address this, our team unpacked the core issues: Where does eldercare fall short, who is on the front lines, and what daily friction do they endure? In response, we designed an app with real-time translation features to foster transparent, day-to-day collaboration and eliminate misunderstandings.
+To validate the solution rapidly, I orchestrated an AI-assisted development workflow to build the functional MVP—leveraging GPT for product scoping and specification audits, and Claude for iterative front-end implementation and fine-tuning.
 
 ## The Pain Point
 According to the data we researched, Taiwan has 873,000 migrant workers, nearly 200,000 of whom work as home caregivers, coming from Indonesia, Vietnam, the Philippines, and Thailand. A survey by Taiwan’s Ministry of Labor found that 35% of households reported difficulties getting along with foreign caregivers, with 72.3% of those difficulties stemming from language communication.
